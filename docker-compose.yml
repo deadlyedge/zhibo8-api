@@ -1,0 +1,12 @@
+version: "3.3"
+
+services:
+
+  zhibo8:
+    image: "zhibo8:latest"
+    container_name: "zhibo8"
+    ports:
+      - "8001:80"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      
