@@ -120,7 +120,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-app/config.toml
+config.toml
 .env
 .venv
 env/
