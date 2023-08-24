@@ -11,7 +11,7 @@ from pymongo.errors import DuplicateKeyError
 from static import xlogger
 from pyquery import PyQuery as pq
 
-config = toml.load('config.toml')
+config = toml.load('../config.toml')
 logger = xlogger.get_my_logger(__name__)
 GRAB_TIMER_BASE = config['app']['GRAB_TIMER_BASE']
 
