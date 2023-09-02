@@ -3,10 +3,10 @@ version: "3.3"
 services:
 
   zhibo8:
-    image: "zhibo8:latest"
-    container_name: "zhibo8"
+    image: "xdream76/zhibo8-api"
+    container_name: "zhibo8api"
     ports:
-      - "8001:80"
+      - "8002:8001"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       
