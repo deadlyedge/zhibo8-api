@@ -5,8 +5,9 @@ services:
   zhibo8:
     image: "xdream76/zhibo8-api"
     container_name: "zhibo8api"
+    restart: unless-stopped
     ports:
-      - "8002:8001"
+      - "8022:8001"
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      
+      - $PWD/config.toml:/app/config.toml:ro
