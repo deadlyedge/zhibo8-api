@@ -1,17 +1,17 @@
 import datetime
-from threading import Thread
-import toml
+import json
+import time
+from pyquery import PyQuery as pq
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from static import xlogger, getLists
 
-config = toml.load("config.toml")
-logger = xlogger.get_my_logger(__name__)
+DEFAULT_TEAMS_STRING = "勇士,北京,北控,掘金,热刺,埃弗顿,F1,皇家马德里"
+ZHIBO8_URL = "https://www.zhibo8.com/"
+HEADER = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
+}
 
-DEFAULT_TEAMS_STRING = config["app"]["DEFAULT_TEAMS_STRING"]
-# getLists.initDB()
-
-# logger.debug(gameList)
 app = FastAPI()
 origins = [
     "*",
@@ -29,8 +29,50 @@ app.add_middleware(
 )
 
 
-def getDB():
-    getLists.initDB()
+def getPage():
+    for retry in range(5):
+        try:
+            rqs = pq(url=ZHIBO8_URL, headers=HEADER, encoding="utf-8")
+            print("通过成功")
+        except Exception as e:
+            print("通过失败，重新尝试... %s" % e)
+            time.sleep(5)
+            continue
+        return rqs
+    print("检查是否可以打开%s" % ZHIBO8_URL)
+    input("输入回车结束程序...")
+    return []
+
+
+def grabGameList() -> dict:
+    gameList = []
+    teamList = set()
+    try:
+        page = getPage()
+        allGame = page("div.schedule li").items()
+    except Exception as e:
+        print("error:", e)
+        allGame = None
+    for game in allGame:
+        gameLabel = game("li")
+        teamInfo = game("b")
+        if gameLabel.attr("label") and len(teamInfo.text().split()) > 1:
+            teamList = set(gameLabel.attr("label").split(",")) | teamList
+            try:
+                gameInfo = {
+                    "ID": gameLabel.attr("id"),
+                    "Labels": gameLabel.attr("label").split(","),
+                    "Time": gameLabel.attr("data-time").split(),
+                    "Team1": teamInfo.text().split()[1],
+                    "Team2": teamInfo.text().split()[-1],
+                    "Broadcast": game("a:first").text().split(),
+                }
+            except AttributeError:
+                return {"gameList": None, "teamList": None}
+            gameList.append(gameInfo)
+    with open("app/gameList.json", "w", encoding="utf-8") as jsonSave:
+        json.dump(gameList, jsonSave, ensure_ascii=False, indent=4)
+    return {"gameList": gameList, "teamList": teamList}
 
 
 def showTime(timeInList: list) -> list:
@@ -59,7 +101,7 @@ def showTime(timeInList: list) -> list:
 
 def favGame(teams: list) -> list:
     result = []
-    gameList = getLists.getGameList()
+    gameList = grabGameList()["gameList"]
     for game in gameList:
         for team in teams:
             if team in game["Labels"]:
@@ -68,9 +110,6 @@ def favGame(teams: list) -> list:
                 # logger.info(game)
                 break
     return result
-
-
-Thread(target=getDB).start()
 
 
 @app.get("/")
@@ -85,7 +124,7 @@ async def getGameList(teams: str = ""):
 @app.get("/teamList/")
 async def showTeamList():
     # logger.info(teamList)
-    teamList = getLists.getTeamList()
+    teamList = grabGameList()['teamList']
     return teamList
 
 
