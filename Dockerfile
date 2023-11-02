@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-alpine
 LABEL maintainer="xdream oldlu <xdream@gmail.com>"
 
 WORKDIR /app
