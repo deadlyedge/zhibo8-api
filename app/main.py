@@ -5,7 +5,7 @@ from pyquery import PyQuery as pq
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-DEFAULT_TEAMS_STRING = "勇士,北京,北控,掘金,热刺,埃弗顿,F1,皇家马德里"
+DEFAULT_TEAMS_STRING = "勇士,阿森纳,F1,皇家马德里"
 ZHIBO8_URL = "https://www.zhibo8.com/"
 HEADER = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -29,83 +29,105 @@ app.add_middleware(
 )
 
 
-def getPage():
-    for retry in range(5):
+def get_page():
+    """connect to zhibo8 site"""
+    for _ in range(5):
         try:
             rqs = pq(url=ZHIBO8_URL, headers=HEADER, encoding="utf-8")
             print("通过成功")
         except Exception as e:
-            print("通过失败，重新尝试... %s" % e)
+            print(f"通过失败，重新尝试...{e}")
             time.sleep(5)
             continue
         return rqs
-    print("检查是否可以打开%s" % ZHIBO8_URL)
+    print(f"检查是否可以打开{ZHIBO8_URL}")
     input("输入回车结束程序...")
     return []
 
 
-def grabGameList() -> dict:
-    gameList = []
-    teamList = set()
+def grab_game_list() -> dict:
+    """grab infos."""
+
     try:
-        page = getPage()
-        allGame = page("div.schedule li").items()
+        with open("gameList.json", "r", encoding="utf-8") as j_load:
+            data_set = json.load(j_load)
+    except FileNotFoundError:
+        data_set = None
+
+    if data_set and time.time() - data_set["timestamp"] < 60 * 60:
+        return {"game_list": data_set["game_list"], "team_list": data_set["team_list"]}
+
+    game_list = []
+    team_list = set()
+
+    try:
+        page = get_page()
+        all_game = page("div.schedule li").items()
     except Exception as e:
         print("error:", e)
-        allGame = None
-    for game in allGame:
-        gameLabel = game("li")
-        teamInfo = game("b")
-        if gameLabel.attr("label") and len(teamInfo.text().split()) > 1:
-            teamList = set(gameLabel.attr("label").split(",")) | teamList
+        all_game = None
+
+    for game in all_game:
+        game_label = game("li")
+        team_info = game("b")
+        if game_label.attr("label") and len(team_info.text().split()) > 1:
+            team_list = set(game_label.attr("label").split(",")) | team_list
             try:
-                gameInfo = {
-                    "ID": gameLabel.attr("id"),
-                    "Labels": gameLabel.attr("label").split(","),
-                    "Time": gameLabel.attr("data-time").split(),
-                    "Team1": teamInfo.text().split()[1],
-                    "Team2": teamInfo.text().split()[-1],
+                game_info = {
+                    "ID": game_label.attr("id"),
+                    "Labels": game_label.attr("label").split(","),
+                    "Time": game_label.attr("data-time").split(),
+                    "Team1": team_info.text().split()[1],
+                    "Team2": team_info.text().split()[-1],
                     "Broadcast": game("a:first").text().split(),
                 }
             except AttributeError:
-                return {"gameList": None, "teamList": None}
-            gameList.append(gameInfo)
-    with open("app/gameList.json", "w", encoding="utf-8") as jsonSave:
-        json.dump(gameList, jsonSave, ensure_ascii=False, indent=4)
-    return {"gameList": gameList, "teamList": teamList}
+                return {"game_list": None, "team_list": None}
+            game_list.append(game_info)
+
+    data_set = {
+        "timestamp": time.time(),
+        "game_list": game_list,
+        "team_list": list(team_list),
+    }
+
+    with open("gameList.json", "w", encoding="utf-8") as j_save:
+        json.dump(data_set, j_save, ensure_ascii=False, indent=4)
+    return {"game_list": game_list, "team_list": team_list}
 
 
-def showTime(timeInList: list) -> list:
+def show_time(time_in_list: list) -> list:
+    """convert time to text"""
     now = datetime.datetime.now().strftime("%H:%M")
     today = datetime.date.today() - datetime.timedelta(
         days=1 if "00:00" < now < "05:00" else 0
     )
     tomorrow = today + datetime.timedelta(days=1)
-    theDayAfterTomorrow = today + datetime.timedelta(days=2)
-    listDay = timeInList[0]
-    listTime = timeInList[1]
-    night = True if "00:00" <= listTime <= "05:00" else False
+    the_day_after_tomorrow = today + datetime.timedelta(days=2)
+    list_day = time_in_list[0]
+    list_time = time_in_list[1]
+    night = "00:00" <= list_time <= "05:00"
 
     # 判断时间是否需要替换为汉字 如果是明天凌晨转换为‘今夜’，同理后天凌晨转换为‘明晚’
-    if listDay == str(tomorrow) and night:
-        return ["今夜", listTime]
-    elif listDay == str(today):
-        return ["今天", listTime]
-    elif listDay == str(tomorrow):
-        return ["明天", listTime]
-    elif listDay == str(theDayAfterTomorrow) and night:
-        return ["明晚", listTime]
-    else:
-        return [listDay[5:10], listTime]  # 切掉年份
+    if list_day == str(tomorrow) and night:
+        return ["今夜", list_time]
+    if list_day == str(today):
+        return ["今天", list_time]
+    if list_day == str(tomorrow):
+        return ["明天", list_time]
+    if list_day == str(the_day_after_tomorrow) and night:
+        return ["明晚", list_time]
+    return [list_day[5:10], list_time]  # 切掉年份
 
 
-def favGame(teams: list) -> list:
+def fav_game(teams: list) -> list:
+    """favor game filter"""
     result = []
-    gameList = grabGameList()["gameList"]
-    for game in gameList:
+    game_list = grab_game_list()["game_list"]
+    for game in game_list:
         for team in teams:
             if team in game["Labels"]:
-                game["showTime"] = showTime(game["Time"])
+                game["showTime"] = show_time(game["Time"])
                 result.append(game)
                 # logger.info(game)
                 break
@@ -113,19 +135,19 @@ def favGame(teams: list) -> list:
 
 
 @app.get("/")
-async def getGameList(teams: str = ""):
+async def get_game_list(teams: str = ""):
+    """entrance of get game list"""
     if not teams:
         teams = DEFAULT_TEAMS_STRING
-    showTeams = teams.split(",")
-    showGame = favGame(showTeams)
-    return showGame
+    show_teams = teams.split(",")
+    return fav_game(show_teams)
 
 
 @app.get("/teamList/")
-async def showTeamList():
+async def get_team_list():
+    """entrance of team_list"""
     # logger.info(teamList)
-    teamList = grabGameList()['teamList']
-    return teamList
+    return grab_game_list()["team_list"]
 
 
 if __name__ == "__main__":
