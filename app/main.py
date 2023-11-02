@@ -1,4 +1,6 @@
+"""manage time shift functions"""
 import datetime
+
 import json
 import time
 from pyquery import PyQuery as pq
@@ -54,7 +56,7 @@ def grab_game_list() -> dict:
     except FileNotFoundError:
         data_set = None
 
-    if data_set and time.time() - data_set["timestamp"] < 60 * 60:
+    if data_set and time.time() - data_set["timestamp"] < 60 * 60 * 2:
         return {"game_list": data_set["game_list"], "team_list": data_set["team_list"]}
 
     game_list = []
@@ -129,7 +131,6 @@ def fav_game(teams: list) -> list:
             if team in game["Labels"]:
                 game["showTime"] = show_time(game["Time"])
                 result.append(game)
-                # logger.info(game)
                 break
     return result
 
@@ -146,7 +147,6 @@ async def get_game_list(teams: str = ""):
 @app.get("/teamList/")
 async def get_team_list():
     """entrance of team_list"""
-    # logger.info(teamList)
     return grab_game_list()["team_list"]
 
 
