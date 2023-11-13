@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 DEFAULT_TEAMS_STRING = "勇士,阿森纳,F1,皇家马德里"
 ZHIBO8_URL = "https://www.zhibo8.com/"
@@ -60,7 +61,7 @@ class GameInfo:
             f"cache saved, {len(self.game_list)} games and {len(self.team_list)} teams."
         )
 
-    def get_html(self):
+    def get_html(self) -> str:
         """获取网页信息"""
         response = requests.get(self.url, headers=self.headers, timeout=5)
         html = response.content.decode("utf-8")
@@ -141,22 +142,23 @@ app.add_middleware(
 games_info = GameInfo()
 
 
-@app.get("/")
-async def get_game_list(teams: str = ""):
+@app.get("/api")
+async def get_game_list(teams: str = DEFAULT_TEAMS_STRING):
     """entrance of get game list"""
-    if not teams:
-        teams = DEFAULT_TEAMS_STRING
     show_teams = teams.split(",")
     games_info.get_cache()
     games_info.filter_game(show_teams)
     return games_info.fav_games
 
 
-@app.get("/teamList/")
+@app.get("/api/teamList")
 async def get_team_list():
     """entrance of team_list"""
     games_info.get_cache()
     return games_info.team_list
+
+
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
 if __name__ == "__main__":
