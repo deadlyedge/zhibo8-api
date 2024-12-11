@@ -1,3 +1,5 @@
+Deprecated and inherited by https://github.com/deadlyedge/zhibo8-next
+
 # zhibo8.v3
 It's a wrapper for zhibo8.cc
 
